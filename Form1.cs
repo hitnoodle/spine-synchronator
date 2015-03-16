@@ -20,6 +20,8 @@ namespace Spine_Animation_Sync
             None,
             Animation,
             Bones,
+            Events,
+            All,
         };
         protected Mode _SyncMode = Mode.None;
 
@@ -47,6 +49,10 @@ namespace Spine_Animation_Sync
                     SynchronizeAnimation(masterAnimation, syncPath);
                 else if (_SyncMode == Mode.Bones)
                     SynchronizeBones(masterAnimation, syncPath);
+                else if (_SyncMode == Mode.Events)
+                    SynchronizeEvents(masterAnimation, syncPath);
+                else if (_SyncMode == Mode.All)
+                    SynchronizeAll(masterAnimation, syncPath);
 
                 MessageBox.Show("Done synchronizing!");
             }
@@ -94,6 +100,72 @@ namespace Spine_Animation_Sync
             }
         }
 
+        private void SynchronizeEvents(string masterAnimation, string syncPath)
+        {
+            int eventsIndex = masterAnimation.IndexOf("events");
+            int startIndex = masterAnimation.IndexOf("{", eventsIndex);
+            int endIndex = GetCurlyBracesEnd(masterAnimation, startIndex);
+
+            string masterEvents = masterAnimation.Substring(startIndex, endIndex - startIndex);
+
+            string[] syncFiles = Directory.GetFiles(syncPath, "*.json");
+            foreach (string syncFile in syncFiles)
+            {
+                string syncAnimation = File.ReadAllText(syncFile);
+
+                int syncEventIndex = syncAnimation.IndexOf("events");
+                if (syncEventIndex != -1)
+                {
+                    int syncStartIndex = syncAnimation.IndexOf("{", syncEventIndex);
+                    int syncEndIndex = GetCurlyBracesEnd(syncAnimation, syncStartIndex);
+
+                    string syncEvents = syncAnimation.Substring(syncStartIndex, syncEndIndex - syncStartIndex);
+                    syncAnimation = syncAnimation.Replace(syncEvents, masterEvents);
+
+                    File.WriteAllText(syncFile, syncAnimation);
+                }
+                else
+                {
+                    int syncStartIndex = syncAnimation.IndexOf(",\"animations\"");
+
+                    string syncEvent = "},\"events\":" + masterEvents;
+                    syncAnimation = syncAnimation.Insert(syncStartIndex - 1, syncEvent);
+
+                    File.WriteAllText(syncFile, syncAnimation);
+                }
+            }
+        }
+
+        int GetCurlyBracesEnd(string master, int startIndex)
+        {
+            int endIndex = master.IndexOf("}", startIndex);
+
+            bool endFound = false;
+            int tempIndex = startIndex + 1;
+            while (!endFound)
+            {
+                int newIndex = master.IndexOf("{", tempIndex);
+                if (tempIndex <= newIndex && newIndex < endIndex)
+                {
+                    endIndex = master.IndexOf("}", endIndex + 1);
+                    tempIndex = newIndex + 1;
+                }
+                else
+                {
+                    endFound = true;
+                }
+            }
+
+            return endIndex;
+        }
+
+        private void SynchronizeAll(string masterAnimation, string syncPath)
+        {
+            SynchronizeBones(masterAnimation, syncPath);
+            SynchronizeEvents(masterAnimation, syncPath);
+            SynchronizeAnimation(masterAnimation, syncPath);
+        }
+
         private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
             string modeText = this.comboBox1.Text;
@@ -101,6 +173,10 @@ namespace Spine_Animation_Sync
                 _SyncMode = Mode.Animation;
             else if (modeText == "Bones")
                 _SyncMode = Mode.Bones;
+            else if (modeText == "Events")
+                _SyncMode = Mode.Events;
+            else if (modeText == "All")
+                _SyncMode = Mode.All;
             else
                 _SyncMode = Mode.None;
         }
